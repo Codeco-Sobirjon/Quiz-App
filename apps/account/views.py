@@ -22,7 +22,9 @@ from drf_yasg import openapi
 class CustomAuthTokenView(APIView):
     permission_classes = [AllowAny]
 
-    @swagger_auto_schema(request_body=CustomAuthTokenSerializer, tags=['Account'])
+    @swagger_auto_schema(request_body=CustomAuthTokenSerializer,
+                         operation_summary="Authenticate user and return JWT tokens.",
+                         tags=['Account'])
     def post(self, request):
         serializer = CustomAuthTokenSerializer(data=request.data)
 
@@ -41,7 +43,7 @@ class CustomAuthTokenView(APIView):
 class UserSignupView(APIView):
     permission_classes = [AllowAny]
 
-    @swagger_auto_schema(request_body=SignUpSerializer, tags=['Account'])
+    @swagger_auto_schema(request_body=SignUpSerializer, tags=['Account'], operation_summary="Sign up a new user.")
     def post(self, request, *args, **kwargs):
         serializer = SignUpSerializer(data=request.data)
         if serializer.is_valid():
@@ -55,7 +57,8 @@ class CustomUserDetailView(APIView):
 
     @swagger_auto_schema(
         responses={200: CustomUserDeatilSerializer()},
-        operation_description="Retrieve details of the authenticated user.", tags=['Account']
+        operation_description="Retrieve details of the authenticated user.", tags=['Account'],
+        operation_summary="Retrieve the profile of the authenticated user."
     )
     def get(self, request):
         user = request.user
@@ -65,11 +68,12 @@ class CustomUserDetailView(APIView):
     @swagger_auto_schema(
         request_body=UpdateUserSerializer,
         responses={200: CustomUserDeatilSerializer()},
-        operation_description="Update the authenticated user's profile.", tags=['Account']
+        operation_description="Update the authenticated user's profile.", tags=['Account'],
+        operation_summary="Update the profile of the authenticated user."
     )
     def put(self, request):
         user = request.user
-        serializer = UpdateUserSerializer(user, data=request.data, partial=True, context={'request': request} )
+        serializer = UpdateUserSerializer(user, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -77,7 +81,8 @@ class CustomUserDetailView(APIView):
 
     @swagger_auto_schema(
         responses={204: 'No Content'},
-        operation_description="Delete the authenticated user's account.", tags=['Account']
+        operation_description="Delete the authenticated user's account.", tags=['Account'],
+        operation_summary="Delete the authenticated user's account."
     )
     def delete(self, request):
         user = request.user
@@ -95,7 +100,8 @@ class PasswordUpdateView(APIView):
             200: "Password updated successfully.",
             400: "Bad Request: Password update failed."
         },
-        operation_description="Update the authenticated user's password."
+        operation_description="Update the authenticated user's password.",
+        operation_summary="Update the password of the authenticated user."
     )
     def patch(self, request):
         serializer = PasswordUpdateSerializer(data=request.data, context={'request': request})

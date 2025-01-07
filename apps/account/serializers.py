@@ -46,34 +46,26 @@ class CustomAuthTokenSerializer(serializers.Serializer):
 
 
 class SignUpSerializer(serializers.ModelSerializer):
-
     password = serializers.CharField(write_only=True, required=True)
     password_confirm = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = get_user_model()
-
         fields = ['phone', 'full_name', 'password', 'password_confirm']
 
     def validate(self, data):
-
         if data['password'] != data['password_confirm']:
             raise ValidationError({"password_confirm": "Пароли не совпадают"})
-
         return data
 
     def create(self, validated_data):
-
         validated_data.pop('password_confirm', None)
-
         user = get_user_model().objects.create_user(
             phone=validated_data['phone'],
             full_name=validated_data['full_name'],
             password=validated_data['password'],
             username=validated_data['phone'],
         )
-
-        user.save()
         return user
 
 

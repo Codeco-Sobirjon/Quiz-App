@@ -7,7 +7,7 @@ from django.utils.translation import gettext as _
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=15, unique=True, verbose_name="Телефон")
     username = models.CharField(max_length=100, unique=True, verbose_name="Логин")
-    full_name = models.CharField(max_length=100, unique=True, verbose_name="ФИО")
+    full_name = models.CharField(max_length=100, verbose_name="ФИО")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     is_staff = models.BooleanField(default=False, verbose_name="Персонал")
 

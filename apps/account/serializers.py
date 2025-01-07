@@ -28,17 +28,17 @@ class CustomAuthTokenSerializer(serializers.Serializer):
         password = data.get('password')
 
         if not identifier or not password:
-            raise serializers.ValidationError("Both email/phone and password are required")
+            raise serializers.ValidationError("Ham telefon/parol, ham parol talab qilinadi")
 
         user_model = get_user_model()
 
         user = user_model.objects.filter(phone=identifier).first()
 
         if user is None:
-            raise AuthenticationFailed("Invalid credentials, no user found")
+            raise AuthenticationFailed("Noto‘g‘ri ma’lumotlar, foydalanuvchi topilmadi")
 
         if not user.check_password(password):
-            raise AuthenticationFailed("Invalid credentials, wrong password")
+            raise AuthenticationFailed("Noto‘g‘ri ma’lumotlar, noto‘g‘ri parol")
 
         return {
             'user': user
@@ -55,7 +55,11 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if data['password'] != data['password_confirm']:
-            raise ValidationError({"password_confirm": "Пароли не совпадают"})
+            raise ValidationError("Parollar mos kelmayapti")
+
+        if get_user_model().objects.filter(phone=data['phone']).exists():
+            raise ValidationError("Ushbu telefon raqami bilan foydalanuvchi allaqachon mavjud")
+
         return data
 
     def create(self, validated_data):

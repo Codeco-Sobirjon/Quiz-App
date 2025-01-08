@@ -145,7 +145,7 @@ class RandomQuizzesView(APIView):
         quiz = get_object_or_404(Quiz, id=quiz_id)
 
         if request.user.is_authenticated:
-            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')
+            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:25]
         else:
             quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
 

@@ -28,6 +28,7 @@ THIRD_PARTY_APPS = [
     'drf_yasg',
     'corsheaders',
     'django_filters',
+    'nested_admin',
     *LOCAL_APPS,
 ]
 

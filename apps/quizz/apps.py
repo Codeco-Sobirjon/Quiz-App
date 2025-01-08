@@ -5,3 +5,6 @@ class QuizzConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'apps.quizz'
     verbose_name = 'Тест Парт'
+
+    def ready(self):
+        import apps.quizz.signals

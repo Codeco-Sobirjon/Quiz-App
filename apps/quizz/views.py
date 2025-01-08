@@ -12,11 +12,14 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
 from apps.quizz.models import (
     SubCategory, TopLevelCategory, Category,
-    Quiz, Question
+    Quiz, QuestionOption, QuizQuestion
 )
 import os
 from django.conf import settings
-from apps.quizz.serializers import TopLevelCategorySerializer, QuizSerializer
+
+from apps.quizz.pagination import QuizPagination
+from apps.quizz.serializers import TopLevelCategorySerializer, QuizSerializer, SubCategorySerializer, \
+    QuizQuestionSerializer
 from apps.quizz.utils import import_tests_from_file
 
 
@@ -37,6 +40,87 @@ class TopLevelCategoryAPIView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class SubCategoryAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        tags=['Categories'],
+        operation_summary="Get all top-level categories with subcategories.",
+        operation_description="Get all top-level categories with subcategories.",
+        responses={200: TopLevelCategorySerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        instance = get_object_or_404(TopLevelCategory, id=kwargs.get('id'))
+
+        categories = SubCategory.objects.select_related('parent').filter(
+            parent=instance
+        )
+        serializer = SubCategorySerializer(categories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class GetQuizChoicesView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        tags=['Quiz'],
+        operation_description="Retrieve available year choices and mode of study choices for quizzes",
+        responses={
+            status.HTTP_200_OK: openapi.Response(
+                description="Successfully retrieved choices",
+            )
+        }
+    )
+    def get(self, request, *args, **kwargs):
+        data = {
+            "year_choices": [{"id": choice[0], "label": choice[1]} for choice in Quiz.YEAR_CHOICES],
+            "mode_of_study_choices": [{"id": choice[0], "label": choice[1]} for choice in Quiz.MODE_OF_STUDY_CHOICES],
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class QuizListView(APIView):
+    permission_classes = [AllowAny]
+
+    @swagger_auto_schema(
+        tags=['Quiz'],
+        operation_summary="Get a list of quizzes",
+        operation_description="Retrieve a list of quizzes with pagination and filtering options. "
+                              "Filters available: mode_of_study, year, category, sub_category, and top_level_category.",
+        manual_parameters=[
+            openapi.Parameter('mode_of_study', openapi.IN_QUERY, description="Filter by mode of study", type=openapi.TYPE_STRING),
+            openapi.Parameter('year', openapi.IN_QUERY, description="Filter by year", type=openapi.TYPE_STRING),
+            openapi.Parameter('sub_category', openapi.IN_QUERY, description="Filter by sub-category ID", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('top_level_category', openapi.IN_QUERY, description="Filter by top level category ID", type=openapi.TYPE_INTEGER),
+        ],
+        responses={200: QuizSerializer(many=True)},
+    )
+    def get(self, request, *args, **kwargs):
+        queryset = Quiz.objects.all().order_by('-id')
+
+        mode_of_study = request.query_params.get('mode_of_study')
+        if mode_of_study:
+            queryset = queryset.filter(mode_of_study=mode_of_study)
+
+        year = request.query_params.get('year')
+        if year:
+            queryset = queryset.filter(year=year)
+
+        sub_category = request.query_params.get('sub_category')
+        if sub_category:
+            queryset = queryset.filter(category__parent__id=sub_category)
+
+        top_level_category = request.query_params.get('top_level_category')
+        if top_level_category:
+            queryset = queryset.filter(category__parent=top_level_category)
+
+        paginator = QuizPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+
+        serializer = QuizSerializer(paginated_queryset, many=True, context={'request': request})
+        return paginator.get_paginated_response(serializer.data)
+
+
 class RandomQuizzesView(APIView):
     permission_classes = [AllowAny]
 
@@ -46,28 +130,29 @@ class RandomQuizzesView(APIView):
         operation_description="Retrieves a list of random quizzes for a given category, including associated questions.",
         responses={
             200: QuizSerializer(many=True),
-            404: 'Category not found or no quizzes in this category.'
+            404: 'Question not found'
         },
         manual_parameters=[
             openapi.Parameter(
-                'category_id',
+                'quiz_id',
                 openapi.IN_PATH,
-                description='ID of the category to filter quizzes by',
+                description='ID of the quiz to filter quizzes by',
                 type=openapi.TYPE_INTEGER
             )
         ]
     )
-    def get(self, request, category_id):
-        queryset = get_object_or_404(Category, id=category_id)
-        try:
-            quiz = Quiz.objects.select_related('category').filter(
-                category=queryset
-            ).order_by('?')[:4]
-        except Quiz.DoesNotExist:
-            return Response({"error": "Category not found or no quizzes in this category."}, status=status.HTTP_404_NOT_FOUND)
+    def get(self, request, quiz_id):
+        quiz = get_object_or_404(Quiz, id=quiz_id)
 
-        serializer = QuizSerializer(quiz, many=True)
+        if request.user.is_authenticated:
+            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')
+        else:
+            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
 
+        if not quiz_questions:
+            return Response({"detail": "Quiz questions not found or no questions in this quiz."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -94,7 +179,7 @@ class CheckQuizView(APIView):
         ]
     )
     def get(self, request, *args, **kwargs):
-        queryset = get_object_or_404(Question, id=kwargs.get('question_id'))
+        queryset = get_object_or_404(QuestionOption, id=kwargs.get('question_id'))
         if queryset.is_correct:
             return Response({'msg': True}, status=status.HTTP_200_OK)
         return Response({'msg': False}, status=status.HTTP_400_BAD_REQUEST)

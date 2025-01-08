@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.quizz.models import (
     SubCategory, TopLevelCategory, Category,
-    Quiz, Question
+    Quiz, QuestionOption, QuestionOption, OrderQuiz, QuizQuestion
 )
 
 
@@ -13,36 +13,46 @@ class SubCategorySerializer(serializers.ModelSerializer):
 
 
 class TopLevelCategorySerializer(serializers.ModelSerializer):
-    subcategory = serializers.SerializerMethodField()
 
     class Meta:
         model = TopLevelCategory
-        fields = ['id', 'name', 'subcategory']
+        fields = ['id', 'name']
 
-    def get_subcategory(self, obj):
-        queryset = Category.objects.select_related('parent').filter(
-            parent=obj
-        )
-        serializer = SubCategorySerializer(queryset, many=True)
+
+class QuizOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuestionOption
+        fields = ['id', 'text', 'is_correct']
+
+
+class QuizQuestionSerializer(serializers.ModelSerializer):
+    option_list = serializers.SerializerMethodField()
+
+    class Meta:
+        model = QuizQuestion
+        fields = ['id', 'title', 'created_at', 'option_list']
+
+    def get_option_list(self, obj):
+
+        instance = QuestionOption.objects.select_related('question').filter(question=obj)
+        serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
         return serializer.data
 
-
-class QuestionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Question
-        fields = ['id', 'text']
 
 
 class QuizSerializer(serializers.ModelSerializer):
-    question_list = serializers.SerializerMethodField()
+    category = SubCategorySerializer(read_only=True)
+    is_buying = serializers.SerializerMethodField()
 
     class Meta:
         model = Quiz
-        fields = ['id', 'title', 'category', 'description', 'created_at', 'question_list']
+        fields = ['id', 'title', 'price', 'semester', 'mode_of_study', 'year',
+                  'category', 'created_at', 'is_buying']
 
-    def get_question_list(self, obj):
-        queryset = Question.objects.select_related('quiz').filter(
-            quiz=obj
-        )
-        serializer = QuestionSerializer(queryset, many=True)
-        return serializer.data
+    def get_is_buying(self, obj):
+        try:
+            if OrderQuiz.objects.select_related('author').filter(author=self.context.get('request').user).select_related('quiz').filter(quiz=obj).exists():
+                return True
+        except:
+            return False
+        return False

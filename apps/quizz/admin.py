@@ -1,8 +1,10 @@
+from django import forms
 from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
+from django.db import models
+import nested_admin
 from apps.quizz.models import (
     Category, TopLevelCategory, SubCategory,
-    Quiz, Question
+    Quiz, QuestionOption, OrderQuiz, QuizQuestion, UploadTests
 )
 
 
@@ -44,18 +46,32 @@ class SubCategoryAdmin(CategoryAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
-class QuestionInlenes(admin.TabularInline):
-    model = Question
+class QuestionOptionInline(nested_admin.NestedTabularInline):
+    model = QuestionOption
     fields = ['text', 'is_correct']
     extra = 1
+    formfield_overrides = {
+        models.CharField: {'widget': forms.Textarea(attrs={'cols': 40, 'rows': 3})}
+    }
+
+
+class QuizQuestionInline(nested_admin.NestedTabularInline):
+    model = QuizQuestion
+    fields = ['title']
+    extra = 1
+    inlines = [QuestionOptionInline]
+
+    formfield_overrides = {
+        models.CharField: {'widget': forms.Textarea(attrs={'cols': 40, 'rows': 3})}
+    }
 
 
 @admin.register(Quiz)
-class QuizAdmin(admin.ModelAdmin):
+class QuizAdmin(nested_admin.NestedModelAdmin):
     list_display = ['title', 'get_category_name', 'created_at']
     search_fields = ['title']
     list_filter = ['category']
-    inlines = [QuestionInlenes]
+    inlines = [QuizQuestionInline]
 
     def get_category_name(self, obj):
         return obj.category.name if obj.category else None
@@ -66,3 +82,16 @@ class QuizAdmin(admin.ModelAdmin):
         if db_field.name == 'category':
             kwargs['queryset'] = Category.objects.filter(parent__isnull=False)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(UploadTests)
+class UploadTestsAdmin(admin.ModelAdmin):
+    list_display = ['quiz__title', 'author', 'created_at']
+    search_fields = ['quiz__title']
+
+
+@admin.register(OrderQuiz)
+class OrderQuizAdmin(admin.ModelAdmin):
+    list_display = ['quiz__title', 'author', 'created_at']
+    search_fields = ['quiz__title']
+

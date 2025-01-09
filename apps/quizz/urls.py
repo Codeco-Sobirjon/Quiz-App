@@ -4,8 +4,8 @@ from apps.quizz.views import TopLevelCategoryAPIView, RandomQuizzesView, CheckQu
     SubCategoryAPIView, GetQuizChoicesView, QuizListView
 
 urlpatterns = [
-    path('fileds/', TopLevelCategoryAPIView.as_view(), name='fileds'),
-    path('sub-fields/<int:id>/', SubCategoryAPIView.as_view(), name='sub-fields'),
+    path('degree/', TopLevelCategoryAPIView.as_view(), name='fileds'),
+    path('field/<int:id>/', SubCategoryAPIView.as_view(), name='sub-fields'),
     path('quiz-choices/', GetQuizChoicesView.as_view(), name='get-quiz-choices'),
     path('all/', QuizListView.as_view(), name='quizs'),
     path('random-quizzes/<int:quiz_id>/', RandomQuizzesView.as_view(), name='random-quizzes'),

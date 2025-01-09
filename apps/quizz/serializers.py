@@ -9,13 +9,13 @@ from apps.quizz.models import (
 class SubCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = SubCategory
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'slug']
 
 
 class TopLevelCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = TopLevelCategory
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'slug']
 
 
 class QuizOptionSerializer(serializers.ModelSerializer):

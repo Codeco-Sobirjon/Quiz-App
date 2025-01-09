@@ -13,7 +13,6 @@ class SubCategorySerializer(serializers.ModelSerializer):
 
 
 class TopLevelCategorySerializer(serializers.ModelSerializer):
-
     class Meta:
         model = TopLevelCategory
         fields = ['id', 'name']
@@ -33,26 +32,42 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'created_at', 'option_list']
 
     def get_option_list(self, obj):
-
         instance = QuestionOption.objects.select_related('question').filter(question=obj)
         serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
         return serializer.data
 
 
-
 class QuizSerializer(serializers.ModelSerializer):
-    category = SubCategorySerializer(read_only=True)
-    is_buying = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+    has_bought = serializers.SerializerMethodField()
+    semester = serializers.SerializerMethodField()
+    mode_of_study = serializers.SerializerMethodField()
+    year = serializers.SerializerMethodField()
 
     class Meta:
         model = Quiz
         fields = ['id', 'title', 'price', 'semester', 'mode_of_study', 'year',
-                  'category', 'created_at', 'is_buying']
+                  'category', 'created_at', 'has_bought']
 
-    def get_is_buying(self, obj):
+    def get_has_bought(self, obj):
         try:
-            if OrderQuiz.objects.select_related('author').filter(author=self.context.get('request').user).select_related('quiz').filter(quiz=obj).exists():
+            if OrderQuiz.objects.select_related('author').filter(
+                    author=self.context.get('request').user).select_related('quiz').filter(quiz=obj).exists():
                 return True
         except:
             return False
         return False
+
+    def get_semester(self, obj):
+        return obj.get_semester_display() if obj.semester else None
+
+    def get_mode_of_study(self, obj):
+        return obj.get_mode_of_study_display() if obj.mode_of_study else None
+
+    def get_year(self, obj):
+        return obj.get_year_display() if obj.year else None
+
+    def get_category(self, obj):
+        if obj.category and obj.category.parent:
+            return SubCategorySerializer(obj.category.parent).data
+        return None

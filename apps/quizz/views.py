@@ -108,11 +108,11 @@ class QuizListView(APIView):
 
         sub_category = request.query_params.get('field')
         if sub_category:
-            queryset = queryset.filter(category__name=sub_category)
+            queryset = queryset.filter(category__slug=sub_category)
 
         top_level_category = request.query_params.get('degree')
         if top_level_category:
-            queryset = queryset.filter(category__parent__name=top_level_category)
+            queryset = queryset.filter(category__parent__slug=top_level_category)
 
         paginator = QuizPagination()
         paginated_queryset = paginator.paginate_queryset(queryset, request)

@@ -16,7 +16,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(TopLevelCategory)
 class TopLevelCategoryAdmin(CategoryAdmin):
-    list_display = ['name', 'created_at', 'id']
+    list_display = ['name', 'slug', 'created_at', 'id']
     search_fields = ['name']
 
     def get_fields(self, request, obj=None):
@@ -31,7 +31,7 @@ class TopLevelCategoryAdmin(CategoryAdmin):
 
 @admin.register(SubCategory)
 class SubCategoryAdmin(CategoryAdmin):
-    list_display = ['name', 'parent', 'created_at', 'id']
+    list_display = ['name', 'slug', 'parent', 'created_at', 'id']
     search_fields = ['name']
 
     def get_list_filter(self, request):

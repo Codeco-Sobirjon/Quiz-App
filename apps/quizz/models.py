@@ -15,7 +15,7 @@ class Category(models.Model):
         related_name='subcategories'
     )
     created_at = models.DateField(auto_now_add=True, null=True, blank=True, verbose_name="Дата публикации")
-
+    slug = models.SlugField(max_length=250, unique=True, null=True, blank=True, verbose_name="Слаг")
     objects = models.Manager()
 
     def __str__(self):

@@ -90,8 +90,8 @@ class QuizListView(APIView):
         manual_parameters=[
             openapi.Parameter('mode_of_study', openapi.IN_QUERY, description="Filter by mode of study", type=openapi.TYPE_STRING),
             openapi.Parameter('year', openapi.IN_QUERY, description="Filter by year", type=openapi.TYPE_STRING),
-            openapi.Parameter('sub_category', openapi.IN_QUERY, description="Filter by sub-category ID", type=openapi.TYPE_INTEGER),
-            openapi.Parameter('top_level_category', openapi.IN_QUERY, description="Filter by top level category ID", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('field', openapi.IN_QUERY, description="Filter by field name", type=openapi.TYPE_STRING),
+            openapi.Parameter('degree', openapi.IN_QUERY, description="Filter by degree name", type=openapi.TYPE_STRING),
         ],
         responses={200: QuizSerializer(many=True)},
     )
@@ -106,13 +106,13 @@ class QuizListView(APIView):
         if year:
             queryset = queryset.filter(year=year)
 
-        sub_category = request.query_params.get('sub_category')
+        sub_category = request.query_params.get('field')
         if sub_category:
-            queryset = queryset.filter(category__parent__id=sub_category)
+            queryset = queryset.filter(category__name=sub_category)
 
-        top_level_category = request.query_params.get('top_level_category')
+        top_level_category = request.query_params.get('degree')
         if top_level_category:
-            queryset = queryset.filter(category__parent=top_level_category)
+            queryset = queryset.filter(category__parent__name=top_level_category)
 
         paginator = QuizPagination()
         paginated_queryset = paginator.paginate_queryset(queryset, request)

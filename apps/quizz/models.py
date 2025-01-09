@@ -51,10 +51,10 @@ class Quiz(models.Model):
     ]
 
     MODE_OF_STUDY_CHOICES = [
-        ('1', _("Очное")),
-        ('2', _("Вечернее")),
-        ('3', _("Дистанционное")),
-        ('4', _("Экстернат")),
+        ('daytime', _("Kunduzki")),
+        ('evening', _("Sirtqi")),
+        ('remote', _("Masofaviy")),
+        ('external', _("Tashqi")),
     ]
 
     YEAR_CHOICES = [

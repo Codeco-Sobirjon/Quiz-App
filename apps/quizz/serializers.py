@@ -38,7 +38,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
 
 
 class QuizSerializer(serializers.ModelSerializer):
-    category = serializers.SerializerMethodField()
+    degree = serializers.SerializerMethodField()
     has_bought = serializers.SerializerMethodField()
     semester = serializers.SerializerMethodField()
     mode_of_study = serializers.SerializerMethodField()
@@ -47,7 +47,7 @@ class QuizSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = ['id', 'title', 'price', 'semester', 'mode_of_study', 'year',
-                  'category', 'created_at', 'has_bought']
+                  'degree', 'created_at', 'has_bought']
 
     def get_has_bought(self, obj):
         try:
@@ -67,7 +67,7 @@ class QuizSerializer(serializers.ModelSerializer):
     def get_year(self, obj):
         return obj.get_year_display() if obj.year else None
 
-    def get_category(self, obj):
+    def get_degree(self, obj):
         if obj.category and obj.category.parent:
             return SubCategorySerializer(obj.category.parent).data
         return None

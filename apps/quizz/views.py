@@ -16,7 +16,7 @@ from django.conf import settings
 
 from apps.quizz.pagination import QuizPagination
 from apps.quizz.serializers import TopLevelCategorySerializer, QuizSerializer, SubCategorySerializer, \
-    QuizQuestionSerializer, QuizResponseSerializer
+    QuizQuestionSerializer
 from apps.quizz.utils import import_tests_from_file
 
 

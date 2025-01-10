@@ -1,25 +1,22 @@
-import random
-
 from django.shortcuts import get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, filters
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
 from apps.quizz.models import (
-    SubCategory, TopLevelCategory, Category,
-    Quiz, QuestionOption, QuizQuestion
+    SubCategory, TopLevelCategory, UserTestAnswers,
+    Quiz, QuestionOption, QuizQuestion, OrderQuiz
 )
 import os
 from django.conf import settings
 
 from apps.quizz.pagination import QuizPagination
 from apps.quizz.serializers import TopLevelCategorySerializer, QuizSerializer, SubCategorySerializer, \
-    QuizQuestionSerializer
+    QuizQuestionSerializer, QuizResponseSerializer
 from apps.quizz.utils import import_tests_from_file
 
 
@@ -145,7 +142,7 @@ class RandomQuizzesView(APIView):
         quiz = get_object_or_404(Quiz, id=quiz_id)
 
         if request.user.is_authenticated:
-            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:25]
+            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
         else:
             quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
 
@@ -154,6 +151,43 @@ class RandomQuizzesView(APIView):
 
         serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class StartTestView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        tags=['Quiz'],
+        operation_summary="Start a quiz test",
+        operation_description="Fetches 25 random questions for a specific quiz if the quiz has been ordered by the user.",
+        manual_parameters=[
+            openapi.Parameter(
+                'quiz_id',
+                openapi.IN_PATH,
+                description="ID of the quiz to fetch questions for",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            )
+        ],
+    )
+    def get(self, request, *args, **kwargs):
+        quiz = get_object_or_404(Quiz, id=kwargs.get('quiz_id'))
+
+        if OrderQuiz.objects.select_related('quiz').filter(quiz=quiz).exists():
+            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:25]
+
+            serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
+            serialized_data = serializer.data
+
+            return Response({
+                "quizz": quiz.title,
+                "test_list": serialized_data
+            }, status=status.HTTP_200_OK)
+
+        return Response(
+            {"error": "You must purchase this quiz to access its questions."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 class CheckQuizView(APIView):

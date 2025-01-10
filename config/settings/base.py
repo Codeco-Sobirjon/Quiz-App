@@ -23,6 +23,7 @@ LOCAL_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
+    'jazzmin',
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_yasg',
@@ -180,3 +181,12 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
 }
 
+JAZZMIN_SETTINGS = {
+    "site_title": "Панель администратора тестового приложения OXU",
+    "site_header": "Моя администрация",
+    "welcome_sign": "Добро пожаловать в панель администратора OXU",
+    "copyright": "Code-co Soft",
+    "search_model": "auth.User",
+
+
+}

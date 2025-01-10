@@ -21,7 +21,7 @@ class TopLevelCategorySerializer(serializers.ModelSerializer):
 class QuizOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionOption
-        fields = ['id', 'text', 'is_correct']
+        fields = ['id', 'text', 'is_correct', 'is_selected']
 
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
@@ -29,7 +29,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QuizQuestion
-        fields = ['id', 'title', 'created_at', 'option_list']
+        fields = ['id', 'title', 'created_at', 'selected_answer', 'option_list']
 
     def get_option_list(self, obj):
         instance = QuestionOption.objects.select_related('question').filter(question=obj)

@@ -113,6 +113,8 @@ class OrderQuiz(models.Model):
                                verbose_name="Автор", related_name="author_order")
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name=_("Дата создания"))
 
+    objects = models.Manager()
+
     def __str__(self):
         return self.quiz.title
 
@@ -123,6 +125,7 @@ class OrderQuiz(models.Model):
 
 class QuizQuestion(models.Model):
     title = models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Название теста"))
+    selected_answer = models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Выбранный ответ"))
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, null=True, blank=True,
                              verbose_name="Тест", related_name='test')
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name=_("Дата создания"))
@@ -143,6 +146,7 @@ class QuestionOption(models.Model):
     )
     text = models.CharField(max_length=500, verbose_name='Текст вопроса', null=True, blank=True)
     is_correct = models.BooleanField(default=False, null=True, blank=True, verbose_name='Правильный ответ')
+    is_selected = models.BooleanField(default=False, null=True, blank=True, verbose_name='Выбрано')
 
     objects = models.Manager()
 
@@ -152,3 +156,13 @@ class QuestionOption(models.Model):
     class Meta:
         verbose_name = 'Вариант ответа'
         verbose_name_plural = 'Варианты ответа'
+
+
+class UserTestAnswers(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True,
+                               verbose_name="Автор", related_name="author_test_answers")
+    test_list = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name=_("Дата создания"))
+
+    objects = models.Manager()
+

@@ -9,4 +9,7 @@ urlpatterns = [
     path('user/', CustomUserDetailView.as_view(), name='user-detail'),
     path('update-password/', PasswordUpdateView.as_view(), name='update-password'),
     path('token/refresh/', TokenRefreshSlidingView.as_view(), name='token_refresh'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+
+
 ]

@@ -22,22 +22,38 @@ from drf_yasg import openapi
 class CustomAuthTokenView(APIView):
     permission_classes = [AllowAny]
 
-    @swagger_auto_schema(request_body=CustomAuthTokenSerializer,
-                         operation_summary="Authenticate user and return JWT tokens.",
-                         tags=['Account'])
+    @swagger_auto_schema(
+        request_body=CustomAuthTokenSerializer,
+        operation_summary="Authenticate user and return JWT tokens.",
+        tags=['Account']
+    )
     def post(self, request):
         serializer = CustomAuthTokenSerializer(data=request.data)
 
         if serializer.is_valid():
             user = serializer.validated_data['user']
-            refresh = RefreshToken.for_user(user)
 
+            self.blacklist_user_tokens(user)
+
+            user.update_token_last_issued()
+
+            refresh = RefreshToken.for_user(user)
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @staticmethod
+    def blacklist_user_tokens(user):
+        from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+
+        try:
+            for token in RefreshToken.objects.filter(user_id=user.id):
+                BlacklistedToken.objects.get_or_create(token=token)
+        except Exception:
+            pass
 
 
 class UserSignupView(APIView):
@@ -114,3 +130,19 @@ class PasswordUpdateView(APIView):
             serializer.update(request.user, serializer.validated_data)
             return Response({"detail": "Password updated successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+
+            request.user.update_token_last_issued()
+
+            return Response({"detail": "Logout successful. Token has been blacklisted."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -32,7 +32,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'created_at', 'selected_answer', 'option_list']
 
     def get_option_list(self, obj):
-        instance = QuestionOption.objects.select_related('question').filter(question=obj)
+        instance = QuestionOption.objects.select_related('question').filter(question=obj).order_by('?')
         serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
         return serializer.data
 

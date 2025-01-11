@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from apps.account.managers.custom_user import CustomUserManager
-from django.utils.translation import gettext as _
+from django.utils.timezone import now
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
@@ -10,6 +10,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     full_name = models.CharField(max_length=100, verbose_name="ФИО")
     is_active = models.BooleanField(default=True, verbose_name="Активен")
     is_staff = models.BooleanField(default=False, verbose_name="Персонал")
+    token_last_issued = models.DateTimeField(null=True, blank=True, default=None)
 
     USERNAME_FIELD = 'phone'
     REQUIRED_FIELDS = ['username']
@@ -22,4 +23,8 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.full_name} ({self.phone})"
+
+    def update_token_last_issued(self):
+        self.token_last_issued = now()
+        self.save()
 

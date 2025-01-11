@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from apps.account.managers.custom_user import CustomUserManager
 from django.utils.timezone import now
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):

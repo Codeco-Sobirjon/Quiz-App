@@ -1,59 +1,38 @@
-from django.contrib.auth.models import Group
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
-from drf_yasg.utils import swagger_auto_schema
 from django.utils.translation import gettext as _
 from rest_framework.permissions import IsAuthenticated
-from apps.account.models import (
-    CustomUser
-)
 from apps.account.serializers import (
     GroupListSerializer, CustomAuthTokenSerializer,
     SignUpSerializer, CustomUserDeatilSerializer, UpdateUserSerializer, PasswordUpdateSerializer,
 )
 from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
 
 class CustomAuthTokenView(APIView):
     permission_classes = [AllowAny]
 
-    @swagger_auto_schema(
-        request_body=CustomAuthTokenSerializer,
-        operation_summary="Authenticate user and return JWT tokens.",
-        tags=['Account']
-    )
+    @swagger_auto_schema(request_body=CustomAuthTokenSerializer,
+                         operation_summary="Authenticate user and return JWT tokens.",
+                         tags=['Account'])
     def post(self, request):
         serializer = CustomAuthTokenSerializer(data=request.data)
 
         if serializer.is_valid():
             user = serializer.validated_data['user']
-
-            self.blacklist_user_tokens(user)
-
-            user.update_token_last_issued()
-
             refresh = RefreshToken.for_user(user)
+
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @staticmethod
-    def blacklist_user_tokens(user):
-        from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
-
-        try:
-            for token in RefreshToken.objects.filter(user_id=user.id):
-                BlacklistedToken.objects.get_or_create(token=token)
-        except Exception:
-            pass
 
 
 class UserSignupView(APIView):

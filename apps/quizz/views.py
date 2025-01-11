@@ -9,14 +9,14 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.files.storage import default_storage
 from apps.quizz.models import (
     SubCategory, TopLevelCategory, UserTestAnswers,
-    Quiz, QuestionOption, QuizQuestion, OrderQuiz
+    Quiz, QuestionOption, QuizQuestion, OrderQuiz, TestAnswerQuestion, TestAnswerQuestionOption
 )
 import os
 from django.conf import settings
 
 from apps.quizz.pagination import QuizPagination
 from apps.quizz.serializers import TopLevelCategorySerializer, QuizSerializer, SubCategorySerializer, \
-    QuizQuestionSerializer
+    QuizQuestionSerializer, TestAnswerQuestionSerializer
 from apps.quizz.utils import import_tests_from_file
 
 
@@ -85,10 +85,12 @@ class QuizListView(APIView):
         operation_description="Retrieve a list of quizzes with pagination and filtering options. "
                               "Filters available: mode_of_study, year, category, sub_category, and top_level_category.",
         manual_parameters=[
-            openapi.Parameter('mode_of_study', openapi.IN_QUERY, description="Filter by mode of study", type=openapi.TYPE_STRING),
+            openapi.Parameter('mode_of_study', openapi.IN_QUERY, description="Filter by mode of study",
+                              type=openapi.TYPE_STRING),
             openapi.Parameter('year', openapi.IN_QUERY, description="Filter by year", type=openapi.TYPE_STRING),
             openapi.Parameter('field', openapi.IN_QUERY, description="Filter by field name", type=openapi.TYPE_STRING),
-            openapi.Parameter('degree', openapi.IN_QUERY, description="Filter by degree name", type=openapi.TYPE_STRING),
+            openapi.Parameter('degree', openapi.IN_QUERY, description="Filter by degree name",
+                              type=openapi.TYPE_STRING),
         ],
         responses={200: QuizSerializer(many=True)},
     )
@@ -144,7 +146,8 @@ class RandomQuizzesView(APIView):
         quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
 
         if not quiz_questions.exists():
-            return Response({"detail": "Quiz questions not found or no questions in this quiz."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Quiz questions not found or no questions in this quiz."},
+                            status=status.HTTP_404_NOT_FOUND)
 
         quiz_serializer = QuizSerializer(quiz, context={'request': request})
         questions_serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
@@ -156,7 +159,7 @@ class RandomQuizzesView(APIView):
 
 
 class StartTestView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     @swagger_auto_schema(
         tags=['Quiz'],
@@ -169,27 +172,155 @@ class StartTestView(APIView):
                 description="ID of the quiz to fetch questions for",
                 type=openapi.TYPE_INTEGER,
                 required=True
-            )
+            ),
+            openapi.Parameter(
+                'start',
+                openapi.IN_QUERY,
+                description="Start the quiz test. Pass 'true' to begin the quiz.",
+                type=openapi.TYPE_BOOLEAN,
+                required=False
+            ),
+            openapi.Parameter(
+                'next',
+                openapi.IN_QUERY,
+                description="Move to the next question. Pass 'true' to navigate forward.",
+                type=openapi.TYPE_BOOLEAN,
+                required=False
+            ),
+            openapi.Parameter(
+                'back',
+                openapi.IN_QUERY,
+                description="Move to the previous question. Pass 'true' to navigate backward.",
+                type=openapi.TYPE_BOOLEAN,
+                required=False
+            ),
+
         ],
     )
     def get(self, request, *args, **kwargs):
         quiz = get_object_or_404(Quiz, id=kwargs.get('quiz_id'))
 
+        start = request.query_params.get('start', False)
+        forward = request.query_params.get('next', False)
+        backward = request.query_params.get('back', False)
+
         if OrderQuiz.objects.select_related('quiz').filter(quiz=quiz).exists():
-            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:25]
 
-            serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
-            serialized_data = serializer.data
+            if start:
+                return self.start(quiz, request)
 
-            return Response({
-                "quizz": quiz.title,
-                "test_list": serialized_data
-            }, status=status.HTTP_200_OK)
+            if forward:
+                return self.forward(quiz, request)
+
+            if backward:
+                return self.backward(quiz, request)
 
         return Response(
             {"error": "You must purchase this quiz to access its questions."},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    def start(self, quiz, request):
+        quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:1]
+
+        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
+        serialized_data = serializer.data
+
+        create_test_answers = UserTestAnswers.objects.create(
+            author=request.user,
+            quiz=quiz
+        )
+
+        for question in quiz_questions:
+            create_test_answers_question = TestAnswerQuestion.objects.create(
+                question=question,
+                test_answer_quiz=create_test_answers
+            )
+
+            for item in serialized_data:
+                if item['id'] == question.id:
+                    for option in item['option_list']:
+                        is_option = get_object_or_404(QuestionOption, id=option['id'])
+                        TestAnswerQuestionOption.objects.create(
+                            test_answer_question=create_test_answers_question,
+                            option=is_option
+                        )
+
+        return Response({
+            "quizz": quiz.title,
+            "test_list": serialized_data
+        }, status=status.HTTP_200_OK)
+
+    def forward(self, quiz, request):
+        quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:1]
+
+        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
+        serialized_data = serializer.data
+
+        instance = UserTestAnswers.objects.select_related('author').filter(
+            author=request.user
+        ).select_related('quiz').filter(
+            quiz=quiz
+        ).last()
+
+        if TestAnswerQuestion.objects.filter(test_answer_quiz=instance).count() >= 25:
+            return Response({"detail": "You have already answered 25 questions for this quiz."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        for question in quiz_questions:
+            create_test_answers_question = TestAnswerQuestion.objects.create(
+                question=question,
+                test_answer_quiz=instance
+            )
+
+            for item in serialized_data:
+                if item['id'] == question.id:
+                    for option in item['option_list']:
+                        is_option = get_object_or_404(QuestionOption, id=option['id'])
+                        TestAnswerQuestionOption.objects.create(
+                            test_answer_question=create_test_answers_question,
+                            option=is_option
+                        )
+
+        return Response({
+            "quizz": quiz.title,
+            "test_list": serialized_data
+        }, status=status.HTTP_200_OK)
+
+    def backward(self, quiz, request):
+        instance = UserTestAnswers.objects.select_related('author', 'quiz').filter(
+            author=request.user,
+            quiz=quiz
+        ).last()
+
+        if not instance:
+            return Response({"detail": "No test answer found."}, status=status.HTTP_404_NOT_FOUND)
+
+        get_back_question = TestAnswerQuestion.objects.select_related('test_answer_quiz').filter(
+            test_answer_quiz=instance
+        )
+
+        if get_back_question.count() < 2:
+            return Response({"detail": "Not enough questions to go backward."}, status=status.HTTP_400_BAD_REQUEST)
+
+        back_question = list(get_back_question)[-2]
+
+        quiz_questions = QuizQuestion.objects.filter(id=back_question.question.id).order_by('?')
+
+        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
+        serialized_data = serializer.data
+
+        get_true_answer = QuestionOption.objects.select_related('question').filter(
+            question=back_question.question, is_correct=True
+        )
+        true_answers = [{"id": option.id, "text": option.text} for option in get_true_answer]
+
+        return Response({
+            "quizz": quiz.title,
+            "test_list": serialized_data,
+            "select_answer": back_question.selected_answer.id if back_question.selected_answer else None,
+            "true_answer": true_answers,
+        }, status=status.HTTP_200_OK)
 
 
 class CheckQuizView(APIView):
@@ -205,7 +336,7 @@ class CheckQuizView(APIView):
                                                         examples={"msg": "False"})
         },
 
-        manual_parameters = [
+        manual_parameters=[
             openapi.Parameter(
                 'question_id',
                 openapi.IN_PATH,
@@ -218,7 +349,12 @@ class CheckQuizView(APIView):
         queryset = get_object_or_404(QuestionOption, id=kwargs.get('question_id'))
         if queryset.is_correct:
             return Response({'msg': True}, status=status.HTTP_200_OK)
-        return Response({'msg': False}, status=status.HTTP_400_BAD_REQUEST)
+
+        get_true_answer = QuestionOption.objects.select_related('question').filter(
+            question=queryset.question, is_correct=True
+        )
+        true_answers = [{"id": option.id, "text": option.text} for option in get_true_answer]
+        return Response({'msg': False, "true_answer": true_answers,}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UploadTestFileView(APIView):

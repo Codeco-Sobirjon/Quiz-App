@@ -4,7 +4,8 @@ from django.db import models
 import nested_admin
 from apps.quizz.models import (
     Category, TopLevelCategory, SubCategory,
-    Quiz, QuestionOption, OrderQuiz, QuizQuestion, UploadTests
+    Quiz, QuestionOption, OrderQuiz, QuizQuestion, UploadTests, UserTestAnswers, TestAnswerQuestionOption,
+    TestAnswerQuestion
 )
 
 
@@ -95,3 +96,21 @@ class OrderQuizAdmin(admin.ModelAdmin):
     list_display = ['quiz__title', 'author', 'created_at']
     search_fields = ['quiz__title']
 
+
+# class TestAnswerQuestionOptionInline(nested_admin.NestedTabularInline):
+#     model = TestAnswerQuestionOption
+#     fields = ['test_answer_question', 'option']
+#     extra = 1
+#
+#
+# class TestAnswerQuestionInline(nested_admin.NestedTabularInline):
+#     model = TestAnswerQuestion
+#     fields = ['question']
+#     extra = 1
+#     inlines = [TestAnswerQuestionOptionInline]
+
+
+# @admin.register(UserTestAnswers)
+# class UserTestAnswersAdmin(nested_admin.NestedModelAdmin):
+#     list_display = ['author']
+#     inlines = [TestAnswerQuestionInline]

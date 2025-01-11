@@ -10,7 +10,5 @@ urlpatterns = [
     path('all/', QuizListView.as_view(), name='quizs'),
     path('random-quizzes/<int:quiz_id>/', RandomQuizzesView.as_view(), name='random-quizzes'),
     path('start-test/<int:quiz_id>/', StartTestView.as_view(), name="start-test"),
-
-    # path('check-quiz/<int:question_id>/', CheckQuizView.as_view(), name='checkl-quiz'),
-    # path('add-quiz/', UploadTestFileView.as_view(), name='add-quiz')
+    path('check-quiz/<int:question_id>/', CheckQuizView.as_view(), name='checkl-quiz'),
 ]

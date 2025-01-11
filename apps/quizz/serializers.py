@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.quizz.models import (
     SubCategory, TopLevelCategory, Category,
-    Quiz, QuestionOption, QuestionOption, OrderQuiz, QuizQuestion
+    Quiz, QuestionOption, QuestionOption, OrderQuiz, QuizQuestion, TestAnswerQuestion, TestAnswerQuestionOption
 )
 
 
@@ -21,7 +21,7 @@ class TopLevelCategorySerializer(serializers.ModelSerializer):
 class QuizOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionOption
-        fields = ['id', 'text', 'is_correct', 'is_selected']
+        fields = ['id', 'text', 'is_correct']
 
 
 class QuizQuestionSerializer(serializers.ModelSerializer):
@@ -29,7 +29,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QuizQuestion
-        fields = ['id', 'title', 'created_at', 'selected_answer', 'option_list']
+        fields = ['id', 'title', 'created_at', 'option_list']
 
     def get_option_list(self, obj):
         instance = QuestionOption.objects.select_related('question').filter(question=obj).order_by('?')
@@ -71,3 +71,32 @@ class QuizSerializer(serializers.ModelSerializer):
         if obj.category and obj.category.parent:
             return SubCategorySerializer(obj.category.parent).data
         return None
+
+
+class TestAnswerQuestionOptionSerializer(serializers.ModelSerializer):
+    title = serializers.SerializerMethodField()
+    class Meta:
+        model = TestAnswerQuestionOption
+        fields = ['id', 'title']
+
+    def get_title(self, obj):
+        return obj.option.text
+
+
+class TestAnswerQuestionSerializer(serializers.ModelSerializer):
+    option_list = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TestAnswerQuestion
+        fields = ['id', 'title', 'selected_answer', 'option_list']
+
+    def get_option_list(self, obj):
+        instance = TestAnswerQuestionOption.objects.select_related('test_answer_question').filter(
+            test_answer_question=obj)
+        serializer = TestAnswerQuestionOptionSerializer(instance, many=True,
+                                                        context={"request": self.context.get('request')})
+        return serializer.data
+
+    def get_title(self, obj):
+        return obj.question.title

@@ -19,6 +19,7 @@ class GroupListSerializer(serializers.ModelSerializer):
 
 
 class CustomAuthTokenSerializer(serializers.Serializer):
+
     identifier = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
@@ -27,15 +28,21 @@ class CustomAuthTokenSerializer(serializers.Serializer):
         password = data.get('password')
 
         if not identifier or not password:
-            raise serializers.ValidationError("Both phone and password are required.")
+            raise serializers.ValidationError("Ham telefon/parol, ham parol talab qilinadi")
 
         user_model = get_user_model()
 
         user = user_model.objects.filter(phone=identifier).first()
-        if not user or not user.check_password(password):
-            raise AuthenticationFailed("Invalid credentials or user not found.")
 
-        return {'user': user}
+        if user is None:
+            raise AuthenticationFailed("Noto‘g‘ri ma’lumotlar, foydalanuvchi topilmadi")
+
+        if not user.check_password(password):
+            raise AuthenticationFailed("Noto‘g‘ri ma’lumotlar, noto‘g‘ri parol")
+
+        return {
+            'user': user
+        }
 
 
 class SignUpSerializer(serializers.ModelSerializer):

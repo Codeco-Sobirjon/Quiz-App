@@ -161,8 +161,33 @@ class QuestionOption(models.Model):
 class UserTestAnswers(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True,
                                verbose_name="Автор", related_name="author_test_answers")
-    test_list = models.JSONField(null=True, blank=True)
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, null=True, blank=True,
+                             verbose_name="Тест", related_name='user_test_answer_quiz')
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name=_("Дата создания"))
 
     objects = models.Manager()
 
+
+class TestAnswerQuestion(models.Model):
+    question = models.ForeignKey(
+        QuizQuestion, on_delete=models.CASCADE, related_name='test_answer_question',
+        null=True, blank=True, verbose_name='Вопрос'
+    )
+    test_answer_quiz = models.ForeignKey(UserTestAnswers, on_delete=models.CASCADE, null=True, blank=True,
+                                         verbose_name="Тест", related_name='test_answer_question')
+    selected_answer = models.ForeignKey('TestAnswerQuestionOption', on_delete=models.CASCADE, null=True, blank=True)
+
+    objects = models.Manager()
+
+
+class TestAnswerQuestionOption(models.Model):
+    test_answer_question = models.ForeignKey(
+        TestAnswerQuestion, on_delete=models.CASCADE, related_name='test_answer_question_options', null=True,
+        blank=True, verbose_name='Вопрос'
+    )
+    option = models.ForeignKey(
+        QuestionOption, on_delete=models.CASCADE, related_name='test_answer_question_option',
+        null=True, blank=True, verbose_name='Вопрос'
+    )
+
+    objects = models.Manager()

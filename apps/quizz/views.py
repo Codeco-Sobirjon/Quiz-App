@@ -141,16 +141,18 @@ class RandomQuizzesView(APIView):
     def get(self, request, quiz_id):
         quiz = get_object_or_404(Quiz, id=quiz_id)
 
-        if request.user.is_authenticated:
-            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
-        else:
-            quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
+        quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
 
-        if not quiz_questions:
+        if not quiz_questions.exists():
             return Response({"detail": "Quiz questions not found or no questions in this quiz."}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        quiz_serializer = QuizSerializer(quiz, context={'request': request})
+        questions_serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
+
+        return Response({
+            "quzi_detail": quiz_serializer.data,
+            "test_list": questions_serializer.data
+        }, status=status.HTTP_200_OK)
 
 
 class StartTestView(APIView):

@@ -154,7 +154,7 @@ class RandomQuizzesView(APIView):
         questions_serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
 
         return Response({
-            "quzi_detail": quiz_serializer.data,
+            "quizz_details": quiz_serializer.data,
             "test_list": questions_serializer.data
         }, status=status.HTTP_200_OK)
 

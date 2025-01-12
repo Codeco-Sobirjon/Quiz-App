@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -327,34 +328,83 @@ class CheckQuizView(APIView):
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        tags=['Quiz'],
-        operation_summary="Check if a Question with the given ID exists.",
-        operation_description="Check if a Question with the given ID exists.",
+        tags=["Quiz"],
+        operation_summary="Check if a Question with the given ID exists and process backward navigation.",
+        operation_description=(
+            "Given a `question_id`, checks if the question exists and determines "
+            "if the user can go backward to a previous question. If correct, "
+            "saves the answer; otherwise, returns the correct answers."
+        ),
         responses={
-            status.HTTP_200_OK: openapi.Response(description="Question exists", examples={"msg": "True"}),
-            status.HTTP_404_NOT_FOUND: openapi.Response(description="Question does not exist",
-                                                        examples={"msg": "False"})
+            status.HTTP_200_OK: openapi.Response(
+                description="Question processed successfully.",
+                examples={"msg": True}
+            ),
+            status.HTTP_400_BAD_REQUEST: openapi.Response(
+                description="Error with input or insufficient questions to go backward.",
+                examples={"detail": "Error message"}
+            ),
+            status.HTTP_404_NOT_FOUND: openapi.Response(
+                description="Question does not exist.",
+                examples={"msg": False}
+            ),
         },
-
         manual_parameters=[
             openapi.Parameter(
                 'question_id',
                 openapi.IN_PATH,
-                description='ID of the question to filter quizzes by',
-                type=openapi.TYPE_INTEGER
+                description="ID of the question to filter quizzes by.",
+                type=openapi.TYPE_INTEGER,
+                required=True
             )
         ]
     )
-    def get(self, request, *args, **kwargs):
-        queryset = get_object_or_404(QuestionOption, id=kwargs.get('question_id'))
-        if queryset.is_correct:
-            return Response({'msg': True}, status=status.HTTP_200_OK)
+    def get(self, request, question_id=None):
+        if not question_id or not isinstance(question_id, int):
+            raise ValidationError({"detail": "Invalid or missing question_id parameter."})
 
-        get_true_answer = QuestionOption.objects.select_related('question').filter(
-            question=queryset.question, is_correct=True
+        question_option = get_object_or_404(QuestionOption, id=question_id)
+
+        instance = (
+            UserTestAnswers.objects.select_related("author", "quiz")
+            .filter(author=request.user, quiz=question_option.question)
+            .last()
         )
-        true_answers = [{"id": option.id, "text": option.text} for option in get_true_answer]
-        return Response({'msg': False, "true_answer": true_answers,}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not instance:
+            return Response(
+                {"detail": "No test answers found for the user in this quiz."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        backward_questions = (
+            TestAnswerQuestion.objects.select_related("test_answer_quiz")
+            .filter(test_answer_quiz=instance)
+            .order_by("id")
+        )
+
+        if backward_questions.count() < 2:
+            return Response(
+                {"detail": "Not enough questions to go backward."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        back_question = backward_questions[-2]
+
+        back_question.selected_answer = question_option
+        back_question.save()
+
+        if question_option.is_correct:
+            return Response({"msg": True}, status=status.HTTP_200_OK)
+
+        correct_answers = QuestionOption.objects.filter(
+            question=question_option.question, is_correct=True
+        ).values("id", "text")
+
+        return Response(
+            {"msg": False, "true_answer": list(correct_answers)},
+            status=status.HTTP_200_OK,
+        )
 
 
 class UploadTestFileView(APIView):

@@ -47,8 +47,8 @@ INSTALLED_APPS = [
 ]
 
 LOCAL_MIDDLEWARE = [
-    'config.middleware.middleware.JsonErrorResponseMiddleware',
-    'config.middleware.middleware.Custom404Middleware',
+    # 'config.middleware.middleware.JsonErrorResponseMiddleware',
+    # 'config.middleware.middleware.Custom404Middleware',
 ]
 
 MIDDLEWARE = [

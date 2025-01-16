@@ -133,7 +133,7 @@ class QuizQuestion(models.Model):
     objects = models.Manager()
 
     def __str__(self):
-        return self.title
+        return f'{self.id}: {self.title}'
 
     class Meta:
         verbose_name = '3. Тест'
@@ -151,7 +151,7 @@ class QuestionOption(models.Model):
     objects = models.Manager()
 
     def __str__(self):
-        return self.text
+        return f'{self.id}: {self.text}'
 
     class Meta:
         verbose_name = 'Вариант ответа'
@@ -174,20 +174,11 @@ class TestAnswerQuestion(models.Model):
         null=True, blank=True, verbose_name='Вопрос'
     )
     test_answer_quiz = models.ForeignKey(UserTestAnswers, on_delete=models.CASCADE, null=True, blank=True,
-                                         verbose_name="Тест", related_name='test_answer_question')
-    selected_answer = models.ForeignKey('TestAnswerQuestionOption', on_delete=models.CASCADE, null=True, blank=True)
+                                         verbose_name="Тест", related_name='author_test_answer_question')
+    selected_answer = models.ForeignKey(
+        QuestionOption, on_delete=models.CASCADE, null=True, blank=True, related_name='selected_answer')
 
     objects = models.Manager()
 
-
-class TestAnswerQuestionOption(models.Model):
-    test_answer_question = models.ForeignKey(
-        TestAnswerQuestion, on_delete=models.CASCADE, related_name='test_answer_question_options', null=True,
-        blank=True, verbose_name='Вопрос'
-    )
-    option = models.ForeignKey(
-        QuestionOption, on_delete=models.CASCADE, related_name='test_answer_question_option',
-        null=True, blank=True, verbose_name='Вопрос'
-    )
-
-    objects = models.Manager()
+    def __str__(self):
+        return f"{self.question}"

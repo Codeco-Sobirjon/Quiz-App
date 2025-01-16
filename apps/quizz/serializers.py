@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.quizz.models import (
     SubCategory, TopLevelCategory, Category,
-    Quiz, QuestionOption, QuestionOption, OrderQuiz, QuizQuestion, TestAnswerQuestion, TestAnswerQuestionOption
+    Quiz, QuestionOption, QuestionOption, OrderQuiz, QuizQuestion, TestAnswerQuestion, UserTestAnswers
 )
 
 
@@ -29,7 +29,7 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QuizQuestion
-        fields = ['id', 'title', 'created_at', 'option_list']
+        fields = ['id', 'title', 'created_at', 'selected_answer', 'option_list']
 
     def get_option_list(self, obj):
         instance = QuestionOption.objects.select_related('question').filter(question=obj).order_by('?')
@@ -73,30 +73,39 @@ class QuizSerializer(serializers.ModelSerializer):
         return None
 
 
-class TestAnswerQuestionOptionSerializer(serializers.ModelSerializer):
-    title = serializers.SerializerMethodField()
-    class Meta:
-        model = TestAnswerQuestionOption
-        fields = ['id', 'title']
-
-    def get_title(self, obj):
-        return obj.option.text
-
-
 class TestAnswerQuestionSerializer(serializers.ModelSerializer):
     option_list = serializers.SerializerMethodField()
     title = serializers.SerializerMethodField()
+    selected_answer = QuizOptionSerializer(read_only=True)
 
     class Meta:
         model = TestAnswerQuestion
         fields = ['id', 'title', 'selected_answer', 'option_list']
 
     def get_option_list(self, obj):
-        instance = TestAnswerQuestionOption.objects.select_related('test_answer_question').filter(
-            test_answer_question=obj)
-        serializer = TestAnswerQuestionOptionSerializer(instance, many=True,
-                                                        context={"request": self.context.get('request')})
+        instance = QuestionOption.objects.select_related('question').filter(question=obj.question).order_by('?')
+        serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
         return serializer.data
 
     def get_title(self, obj):
         return obj.question.title
+
+
+class UserTestAnswersListSerializer(serializers.ModelSerializer):
+    quiz = QuizSerializer(read_only=True)
+    test_list = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserTestAnswers
+        fields = [
+            'id', 'quiz', 'created_at', 'test_list'
+        ]
+
+    def get_test_list(self, obj):
+        queryset = TestAnswerQuestion.objects.select_related('test_answer_quiz').filter(
+            test_answer_quiz=obj
+        )
+        serializer = TestAnswerQuestionSerializer(queryset, many=True, context={
+            'request': self.context.get('request')
+        })
+        return serializer.data

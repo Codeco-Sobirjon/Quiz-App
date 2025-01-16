@@ -347,6 +347,7 @@ class StartTestView(APIView):
         # }, status=status.HTTP_200_OK)
         return Response()
 
+
 class CheckQuizView(APIView):
     permission_classes = [AllowAny]
 
@@ -364,7 +365,7 @@ class CheckQuizView(APIView):
         },
         manual_parameters=[
             openapi.Parameter(
-                'question_id',
+                'option_id',
                 openapi.IN_PATH,
                 description='ID of the question to filter quizzes by',
                 type=openapi.TYPE_INTEGER

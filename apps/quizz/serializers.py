@@ -21,6 +21,12 @@ class TopLevelCategorySerializer(serializers.ModelSerializer):
 class QuizOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionOption
+        fields = ['id', 'text']
+
+
+class QuizOptionDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuestionOption
         fields = ['id', 'text', 'is_correct']
 
 
@@ -76,7 +82,7 @@ class QuizSerializer(serializers.ModelSerializer):
 class TestAnswerQuestionSerializer(serializers.ModelSerializer):
     option_list = serializers.SerializerMethodField()
     title = serializers.SerializerMethodField()
-    selected_answer = QuizOptionSerializer(read_only=True)
+    selected_answer = QuizOptionDetailSerializer(read_only=True)
 
     class Meta:
         model = TestAnswerQuestion
@@ -84,7 +90,7 @@ class TestAnswerQuestionSerializer(serializers.ModelSerializer):
 
     def get_option_list(self, obj):
         instance = QuestionOption.objects.select_related('question').filter(question=obj.question).order_by('?')
-        serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
+        serializer = QuizOptionDetailSerializer(instance, many=True, context={"request": self.context.get('request')})
         return serializer.data
 
     def get_title(self, obj):

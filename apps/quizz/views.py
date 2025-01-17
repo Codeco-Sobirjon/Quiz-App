@@ -374,7 +374,7 @@ class CheckQuizView(APIView):
         get_back_question.save()
         true_answers = [{"id": option.id, "text": option.text} for option in get_true_answer]
 
-        return Response({'msg': False, "true_answer": true_answers}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'msg': False, "true_answer": true_answers}, status=status.HTTP_200_OK)
 
 
 class UploadTestFileView(APIView):
@@ -469,8 +469,8 @@ class FinishTestAuthor(APIView):
         persentage_true_answers = (count_true_answers * 100) / 25
         responce_data = {
             'results': instance,
-            'count_true_answers': count_true_answers,
-            'persentage_true_answers': persentage_true_answers
+            'count_correct_answers': count_true_answers,
+            'persentage_correct_answers': persentage_true_answers
         }
         serializer = TestResultSerializer(responce_data, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -109,3 +109,9 @@ class UserTestAnswersListSerializer(serializers.ModelSerializer):
             'request': self.context.get('request')
         })
         return serializer.data
+
+
+class TestResultSerializer(serializers.Serializer):
+    results = UserTestAnswersListSerializer()
+    count_true_answers = serializers.IntegerField()
+    persentage_true_answers = serializers.FloatField()

@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -16,7 +17,7 @@ from django.conf import settings
 
 from apps.quizz.pagination import QuizPagination
 from apps.quizz.serializers import TopLevelCategorySerializer, QuizSerializer, SubCategorySerializer, \
-    QuizQuestionSerializer, TestAnswerQuestionSerializer, UserTestAnswersListSerializer
+    QuizQuestionSerializer, TestAnswerQuestionSerializer, UserTestAnswersListSerializer, TestResultSerializer
 from apps.quizz.utils import import_tests_from_file
 
 
@@ -485,8 +486,16 @@ class FinishTestAuthor(APIView):
     def get(self, request):
 
         instance = UserTestAnswers.objects.select_related('author').filter(
-            author=request.user,
+            author=request.user
         ).last()
-
-        serializer = UserTestAnswersListSerializer(instance, context={'request': request})
+        count_true_answers = TestAnswerQuestion.objects.select_related('test_answer_quiz', 'selected_answer').filter(
+            test_answer_quiz=instance, selected_answer__is_correct=True
+        ).count()
+        persentage_true_answers = (count_true_answers * 100) / 25
+        responce_data = {
+            'results': instance,
+            'count_true_answers': count_true_answers,
+            'persentage_true_answers': persentage_true_answers
+        }
+        serializer = TestResultSerializer(responce_data, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -141,8 +141,8 @@ class RandomQuizzesView(APIView):
             )
         ]
     )
-    def get(self, request, quiz_id):
-        quiz = get_object_or_404(Quiz, id=quiz_id)
+    def get(self, request, quizz_id):
+        quiz = get_object_or_404(Quiz, id=quizz_id)
 
         quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('id')[:5]
 
@@ -154,7 +154,7 @@ class RandomQuizzesView(APIView):
         questions_serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
 
         return Response({
-            "quzi_detail": quiz_serializer.data,
+            "quizz_details": quiz_serializer.data,
             "test_list": questions_serializer.data
         }, status=status.HTTP_200_OK)
 
@@ -168,7 +168,7 @@ class StartTestView(APIView):
         operation_description="Fetches 25 random questions for a specific quiz if the quiz has been ordered by the user.",
         manual_parameters=[
             openapi.Parameter(
-                'quiz_id',
+                'quizz_id',
                 openapi.IN_PATH,
                 description="ID of the quiz to fetch questions for",
                 type=openapi.TYPE_INTEGER,
@@ -205,7 +205,7 @@ class StartTestView(APIView):
         ],
     )
     def get(self, request, *args, **kwargs):
-        quiz = get_object_or_404(Quiz, id=kwargs.get('quiz_id'))
+        quiz = get_object_or_404(Quiz, id=kwargs.get('quizz_id'))
 
         start = request.query_params.get('start', False)
         forward = request.query_params.get('next', False)
@@ -307,7 +307,7 @@ class StartTestView(APIView):
 
                 select_answer = []
                 selected_answer = previous_question.selected_answer
-                if selected_answer:  # If selected_answer is a queryset
+                if selected_answer:
                     select_answer = [{"id": selected_answer.id, "text": selected_answer.text}]
 
                 return Response({
@@ -323,30 +323,6 @@ class StartTestView(APIView):
                 }, status=status.HTTP_200_OK)
         else:
             return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        # if get_back_question.count() < 2:
-        #     return Response({"detail": "Not enough questions to go backward."}, status=status.HTTP_400_BAD_REQUEST)
-        #
-        # back_question = list(get_back_question)[-2]
-        #
-        # quiz_questions = QuizQuestion.objects.filter(id=back_question.question.id).order_by('?')
-        #
-        # serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
-        # serialized_data = serializer.data
-        #
-        # get_true_answer = QuestionOption.objects.select_related('question').filter(
-        #     question=back_question.question, is_correct=True
-        # )
-        # true_answers = [{"id": option.id, "text": option.text} for option in get_true_answer]
-        # select_answer = [{"id": option.id, "text": option.text} for option in
-        #                  [back_question.selected_answer]] if back_question.selected_answer else None
-        # return Response({
-        #     "quizz": quiz.title,
-        #     "test_list": serialized_data,
-        #     "select_answer": select_answer,
-        #     "true_answer": true_answers,
-        # }, status=status.HTTP_200_OK)
-        return Response()
 
 
 class CheckQuizView(APIView):
@@ -484,7 +460,6 @@ class FinishTestAuthor(APIView):
         tags=['Quiz'],
     )
     def get(self, request):
-
         instance = UserTestAnswers.objects.select_related('author').filter(
             author=request.user
         ).last()
@@ -498,4 +473,43 @@ class FinishTestAuthor(APIView):
             'persentage_true_answers': persentage_true_answers
         }
         serializer = TestResultSerializer(responce_data, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class BackQuestionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Retrieve detailed information about a specific test answer question.",
+        operation_summary="Get Test Answer Question Details",
+        manual_parameters=[
+            openapi.Parameter(
+                'quizz_id',
+                openapi.IN_PATH,
+                description="ID of the TestAnswerQuestion instance",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            )
+        ],
+        responses={
+            status.HTTP_200_OK: openapi.Response(
+                description="Successful retrieval of test answer question details.",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the question"),
+                        'question': openapi.Schema(type=openapi.TYPE_STRING, description="Question text"),
+                        'test_answer_quiz': openapi.Schema(type=openapi.TYPE_INTEGER, description="Related quiz ID"),
+                        'selected_answer': openapi.Schema(type=openapi.TYPE_INTEGER, description="Selected answer ID"),
+                    }
+                )
+            ),
+            status.HTTP_404_NOT_FOUND: openapi.Response(description="TestAnswerQuestion not found.")
+        },
+        tags=['Quiz']
+    )
+    def get(self, request, *args, **kwargs):
+        instance = get_object_or_404(TestAnswerQuestion, id=kwargs.get('quizz_id'))
+
+        serializer = TestAnswerQuestionSerializer(instance, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)

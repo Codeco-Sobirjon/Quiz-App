@@ -14,10 +14,12 @@ from apps.quizz.models import (
 )
 import os
 from django.conf import settings
-
+from django.utils.timezone import now
+from datetime import timedelta
 from apps.quizz.pagination import QuizPagination
 from apps.quizz.serializers import TopLevelCategorySerializer, QuizSerializer, SubCategorySerializer, \
-    QuizQuestionSerializer, TestAnswerQuestionSerializer, UserTestAnswersListSerializer, TestResultSerializer
+    QuizQuestionSerializer, TestAnswerQuestionSerializer, UserTestAnswersListSerializer, TestResultSerializer, \
+    QuizQuestionRetireSerializer
 from apps.quizz.utils import import_tests_from_file
 
 
@@ -202,6 +204,13 @@ class StartTestView(APIView):
                 type=openapi.TYPE_INTEGER,
                 required=False
             ),
+            openapi.Parameter(
+                'reset',
+                openapi.IN_QUERY,
+                description="Reset the quiz if it's already started. Pass 'true' to reset and start again.",
+                type=openapi.TYPE_BOOLEAN,
+                required=False
+            ),
         ],
     )
     def get(self, request, *args, **kwargs):
@@ -211,6 +220,7 @@ class StartTestView(APIView):
         forward = request.query_params.get('next', False)
         backward = request.query_params.get('back', False)
         question_id = request.query_params.get('question_id', False)
+        reset = request.query_params.get('reset', False)
 
         if OrderQuiz.objects.select_related('quiz').filter(quiz=quiz).exists():
 
@@ -218,10 +228,13 @@ class StartTestView(APIView):
                 return self.start(quiz, request)
 
             if forward:
-                return self.forward(quiz, request)
+                return self.forward(quiz, request, question_id)
 
             if backward and question_id:
                 return self.backward(quiz, request, question_id)
+
+            if reset:
+                return self.reset_test(quiz, request)
 
         return Response(
             {"error": "You must purchase this quiz to access its questions."},
@@ -229,53 +242,109 @@ class StartTestView(APIView):
         )
 
     def start(self, quiz, request):
-        quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:1]
+        TIME_LIMIT = timedelta(hours=1)
 
-        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
-        serialized_data = serializer.data
+        existing_test = UserTestAnswers.objects.filter(
+            author=request.user, quiz=quiz
+        ).last()
+
+        if existing_test:
+            if not existing_test.is_completed and now() - existing_test.updated_at <= TIME_LIMIT:
+                existing_questions = TestAnswerQuestion.objects.filter(
+                    test_answer_quiz=existing_test
+                )
+                serialized_questions = [
+                    QuizQuestionRetireSerializer(question.question, context={'request': request}).data
+                    for question in existing_questions
+                ]
+                return Response({
+                    "quizz": quiz.title,
+                    "test_list": serialized_questions
+                }, status=status.HTTP_200_OK)
+            existing_test.is_completed = True
+            existing_test.save()
+
+        quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:1]
 
         create_test_answers = UserTestAnswers.objects.create(
             author=request.user,
-            quiz=quiz
+            quiz=quiz,
+            is_completed=False
         )
 
         for question in quiz_questions:
-            create_test_answers_question = TestAnswerQuestion.objects.create(
+            TestAnswerQuestion.objects.create(
                 question=question,
                 test_answer_quiz=create_test_answers
             )
 
+        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
         return Response({
             "quizz": quiz.title,
-            "test_list": serialized_data
+            "test_list": serializer.data
         }, status=status.HTTP_200_OK)
 
-    def forward(self, quiz, request):
-        quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:1]
-
-        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
-        serialized_data = serializer.data
-
-        instance = UserTestAnswers.objects.select_related('author').filter(
-            author=request.user
-        ).select_related('quiz').filter(
-            quiz=quiz
+    def forward(self, quiz, request, question_ids):
+        instance = UserTestAnswers.objects.filter(
+            author=request.user, quiz=quiz, is_completed=False
         ).last()
 
-        if TestAnswerQuestion.objects.filter(test_answer_quiz=instance).count() >= 25:
-            return Response({"detail": "You have already answered 25 questions for this quiz."},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if not instance:
+            return Response({
+                "detail": "No active test found for this quiz."
+            }, status=status.HTTP_404_NOT_FOUND)
 
-        for question in quiz_questions:
-            create_test_answers_question = TestAnswerQuestion.objects.create(
-                question=question,
-                test_answer_quiz=instance
-            )
+        answered_questions = TestAnswerQuestion.objects.filter(
+            test_answer_quiz=instance
+        ).values_list('question_id', flat=True)
+
+        if len(answered_questions) >= 25:
+            instance.is_completed = True
+            instance.save()
+            return Response({
+                "detail": "You have already answered 25 questions for this quiz."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if question_ids:
+            available_test = TestAnswerQuestion.objects.filter(
+                test_answer_quiz=instance, question=question_ids,
+            ).first()
+
+            if available_test:
+                next_question = TestAnswerQuestion.objects.filter(
+                    test_answer_quiz=instance
+                ).filter(
+                    id__gt=available_test.id
+                ).order_by('question').first()
+
+                if next_question:
+                    serializer = QuizQuestionSerializer(next_question.question, context={'request': request})
+                    return Response({
+                        "quizz": quiz.title,
+                        "test_list": [serializer.data]
+                    }, status=status.HTTP_200_OK)
+                else:
+                    quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:1]
+                    if quiz_questions.exists():
+                        random_question = quiz_questions.first()
+                        TestAnswerQuestion.objects.create(
+                            question=random_question,
+                            test_answer_quiz=instance
+                        )
+
+                        serializer = QuizQuestionSerializer(random_question, context={'request': request})
+                        return Response({
+                            "quizz": quiz.title,
+                            "test_list": [serializer.data]
+                        }, status=status.HTTP_200_OK)
+                    else:
+                        return Response({
+                            "detail": "No more questions available in the quiz."
+                        }, status=status.HTTP_404_NOT_FOUND)
 
         return Response({
-            "quizz": quiz.title,
-            "test_list": serialized_data
-        }, status=status.HTTP_200_OK)
+            "detail": "The specified question is not part of the active test."
+        }, status=status.HTTP_404_NOT_FOUND)
 
     def backward(self, quiz, request, question_id):
         instance = UserTestAnswers.objects.select_related('author', 'quiz').filter(
@@ -323,6 +392,36 @@ class StartTestView(APIView):
                 }, status=status.HTTP_200_OK)
         else:
             return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def reset_test(self, quiz, request):
+        existing_test = UserTestAnswers.objects.filter(
+            author=request.user, quiz=quiz
+        ).last()
+
+        if existing_test:
+            existing_test.is_completed = True
+            existing_test.save()
+
+        quiz_questions = QuizQuestion.objects.filter(quiz=quiz).order_by('?')[:1]
+
+        create_test_answers = UserTestAnswers.objects.create(
+            author=request.user,
+            quiz=quiz,
+            is_completed=False
+        )
+
+        for question in quiz_questions:
+            TestAnswerQuestion.objects.create(
+                question=question,
+                test_answer_quiz=create_test_answers
+            )
+
+        serializer = QuizQuestionSerializer(quiz_questions, many=True, context={'request': request})
+        return Response({
+            "quizz": quiz.title,
+            "test_list": serializer.data
+        }, status=status.HTTP_200_OK)
+
 
 
 class CheckQuizView(APIView):

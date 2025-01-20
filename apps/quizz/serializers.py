@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 
 from apps.quizz.models import (
@@ -35,10 +36,66 @@ class QuizQuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QuizQuestion
-        fields = ['id', 'title', 'created_at', 'selected_answer', 'option_list']
+        fields = ['id', 'title', 'option_list']
 
     def get_option_list(self, obj):
-        instance = QuestionOption.objects.select_related('question').filter(question=obj).order_by('?')
+        instance = QuestionOption.objects.filter(question=obj).order_by('?')
+        serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
+        return serializer.data
+
+
+class QuizQuestionRetireSerializer(serializers.ModelSerializer):
+    option_list = serializers.SerializerMethodField()
+    selected_answer = serializers.SerializerMethodField()
+    correct_answer = serializers.SerializerMethodField()
+
+    class Meta:
+        model = QuizQuestion
+        fields = ['id', 'title', 'selected_answer', 'correct_answer', 'option_list']
+
+    def get_option_list(self, obj):
+        instance = QuestionOption.objects.filter(question=obj).order_by('?')
+        serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
+        return serializer.data
+
+    def get_selected_answer(self, obj):
+        existing_test = UserTestAnswers.objects.filter(
+            author=self.context.get('request').user, quiz=obj.quiz
+        ).last()
+
+        if not existing_test:
+            return []
+
+        queryset = TestAnswerQuestion.objects.select_related('test_answer_quiz', 'question').filter(
+            test_answer_quiz=existing_test, question=obj
+        ).values('selected_answer__id')
+
+        instance = QuestionOption.objects.filter(id__in=queryset)
+
+        if not instance.exists():
+            return []
+
+        serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
+        return serializer.data
+
+    def get_correct_answer(self, obj):
+        existing_test = UserTestAnswers.objects.filter(
+            author=self.context.get('request').user, quiz=obj.quiz
+        ).last()
+
+        if not existing_test:
+            return []
+
+        queryset = TestAnswerQuestion.objects.select_related('test_answer_quiz', 'question').filter(
+            test_answer_quiz=existing_test, question=obj
+        ).values('question__id')
+
+        instance = QuestionOption.objects.select_related('question').filter(
+            question__in=queryset, is_correct=True)
+
+        if not instance.exists():
+            return []
+
         serializer = QuizOptionSerializer(instance, many=True, context={"request": self.context.get('request')})
         return serializer.data
 

@@ -164,6 +164,8 @@ class UserTestAnswers(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, null=True, blank=True,
                              verbose_name="Тест", related_name='user_test_answer_quiz')
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True, verbose_name=_("Дата создания"))
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True, verbose_name='Обновлено')
+    is_completed = models.BooleanField(default=False, null=True, blank=True, verbose_name='Завершено')
 
     objects = models.Manager()
 
